@@ -29,6 +29,8 @@ const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilter
   const { data: fleetsData, isLoading: fleetsLoading, error: fleetsError } = useQuery({
     queryKey: ['fleets'],
     queryFn: () => apiService.getFleets(),
+    retry: 3,
+    retryDelay: 1000,
   });
 
   useEffect(() => {
@@ -131,6 +133,12 @@ const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilter
           <div className="text-center py-4 text-red-600">
             <p>Error loading fleets data</p>
             <p className="text-sm">Please check your connection</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-2 px-3 py-1 bg-red-600 text-white rounded text-sm"
+            >
+              Retry
+            </button>
           </div>
         </CardContent>
       </Card>

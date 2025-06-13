@@ -7,30 +7,51 @@ import { Badge } from '@/components/ui/badge';
 import { Download, BarChart3 } from 'lucide-react';
 import { apiService } from '../services/api';
 import BasicFilter from './BasicFilter';
+import { useQuery } from '@tanstack/react-query';
 
 const RatingSummary = () => {
   const [ratingsData, setRatingsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<any>({});
 
-  const ratingGroups = {
-    'overall': {
-      title: 'Overall & Pre/Post',
-      metrics: ['Overall Holiday', 'Embarkation/Disembarkation', 'Value for Money', 'Pre-Cruise Hotel Accommodation']
-    },
-    'accommodation': {
-      title: 'Onboard Accommodation',
-      metrics: ['Cabins', 'Cabin Cleanliness', 'Crew Friendliness', 'Ship Condition/Cleanliness (Public Areas)']
-    },
-    'food': {
-      title: 'Food & Beverage',
-      metrics: ['F&B Quality', 'F&B Staff Service', 'Bar Service', 'Drinks Offerings and Menu']
-    },
-    'activities': {
-      title: 'Activities & Services',
-      metrics: ['Entertainment', 'Excursions', 'Prior Customer Service', 'Flight', 'App Booking']
-    }
-  };
+  // Fetch metrics from backend to create rating groups
+  const { data: metricsData } = useQuery({
+    queryKey: ['metrics'],
+    queryFn: () => apiService.getMetrics(),
+  });
+
+  // Dynamic rating groups based on backend metrics
+  const ratingGroups = React.useMemo(() => {
+    if (!metricsData?.data) return {};
+    
+    const metrics = metricsData.data;
+    return {
+      'overall': {
+        title: 'Overall & Pre/Post',
+        metrics: metrics.filter((m: string) => 
+          m.includes('Overall') || m.includes('Value') || m.includes('Prior') || m.includes('Flight') || m.includes('App') || m.includes('Pre-Cruise')
+        )
+      },
+      'accommodation': {
+        title: 'Onboard Accommodation',
+        metrics: metrics.filter((m: string) => 
+          m.includes('Cabin') || m.includes('Crew') || m.includes('Ship Condition')
+        )
+      },
+      'food': {
+        title: 'Food & Beverage',
+        metrics: metrics.filter((m: string) => 
+          m.includes('F&B') || m.includes('Bar') || m.includes('Drinks')
+        )
+      },
+      'activities': {
+        title: 'Activities & Services',
+        metrics: metrics.filter((m: string) => 
+          m.includes('Entertainment') || m.includes('Excursions') || m.includes('Embarkation')
+        )
+      }
+    };
+  }, [metricsData]);
 
   const handleFilterChange = async (newFilters: any) => {
     setFilters(newFilters);
@@ -49,14 +70,22 @@ const RatingSummary = () => {
       setRatingsData(response.data);
     } catch (error) {
       console.error('Error fetching ratings:', error);
+      alert('Failed to fetch ratings data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const exportToExcel = () => {
-    // Simple CSV export for Excel compatibility
-    const headers = ['Ship Name', 'Sailing Number', 'Fleet', 'Start', 'End', ...Object.values(ratingGroups).flatMap(group => group.metrics)];
+    if (ratingsData.length === 0) {
+      alert('No data to export');
+      return;
+    }
+    
+    // Get all available metrics from the data
+    const allMetrics = metricsData?.data || [];
+    const headers = ['Ship Name', 'Sailing Number', 'Fleet', 'Start', 'End', ...allMetrics];
+    
     const csvContent = ratingsData.map(row => 
       headers.map(header => `"${row[header] || 'N/A'}"`).join(',')
     ).join('\n');
@@ -65,14 +94,17 @@ const RatingSummary = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'rating-summary.csv';
+    a.download = `rating-summary-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
-  const getRatingColor = (rating: number) => {
-    if (rating >= 8) return 'bg-green-100 text-green-800';
-    if (rating >= 6) return 'bg-yellow-100 text-yellow-800';
-    if (rating >= 4) return 'bg-orange-100 text-orange-800';
+  const getRatingColor = (rating: number | string) => {
+    const numRating = typeof rating === 'string' ? parseFloat(rating) : rating;
+    if (isNaN(numRating)) return 'bg-gray-100 text-gray-800';
+    if (numRating >= 8) return 'bg-green-100 text-green-800';
+    if (numRating >= 6) return 'bg-yellow-100 text-yellow-800';
+    if (numRating >= 4) return 'bg-orange-100 text-orange-800';
     return 'bg-red-100 text-red-800';
   };
 
@@ -102,71 +134,69 @@ const RatingSummary = () => {
               </CardContent>
             </Card>
           ) : ratingsData.length > 0 ? (
-            <Tabs defaultValue="overall" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                {Object.entries(ratingGroups).map(([key, group]) => (
-                  <TabsTrigger key={key} value={key} className="text-xs">
-                    {group.title}
-                  </TabsTrigger>
-                ))}
+            <Tabs defaultValue="overview" className="w-full">
+              <TabsList className="grid w-full grid-cols-1">
+                <TabsTrigger value="overview">All Ratings</TabsTrigger>
               </TabsList>
 
-              {Object.entries(ratingGroups).map(([key, group]) => (
-                <TabsContent key={key} value={key}>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>{group.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse border border-gray-300">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="border border-gray-300 p-2 text-left">Ship</th>
-                              <th className="border border-gray-300 p-2 text-left">Sailing</th>
-                              <th className="border border-gray-300 p-2 text-left">Fleet</th>
-                              {group.metrics.map(metric => (
-                                <th key={metric} className="border border-gray-300 p-2 text-center text-xs">
-                                  {metric}
-                                </th>
+              <TabsContent value="overview">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Rating Summary ({ratingsData.length} sailings)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="border border-gray-300 p-2 text-left">Ship</th>
+                            <th className="border border-gray-300 p-2 text-left">Sailing</th>
+                            <th className="border border-gray-300 p-2 text-left">Fleet</th>
+                            <th className="border border-gray-300 p-2 text-left">Period</th>
+                            {metricsData?.data?.slice(0, 6).map((metric: string) => (
+                              <th key={metric} className="border border-gray-300 p-2 text-center text-xs">
+                                {metric}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ratingsData.map((row, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="border border-gray-300 p-2 font-medium">
+                                {row['Ship Name']}
+                              </td>
+                              <td className="border border-gray-300 p-2">
+                                {row['Sailing Number']}
+                              </td>
+                              <td className="border border-gray-300 p-2 capitalize">
+                                {row['Fleet']}
+                              </td>
+                              <td className="border border-gray-300 p-2 text-xs">
+                                {row['Start']} to {row['End']}
+                              </td>
+                              {metricsData?.data?.slice(0, 6).map((metric: string) => (
+                                <td key={metric} className="border border-gray-300 p-2 text-center">
+                                  {row[metric] !== undefined && row[metric] !== null && row[metric] !== '' ? (
+                                    <Badge 
+                                      className={getRatingColor(row[metric])}
+                                      variant="secondary"
+                                    >
+                                      {typeof row[metric] === 'number' ? row[metric].toFixed(1) : row[metric]}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-gray-400">N/A</span>
+                                  )}
+                                </td>
                               ))}
                             </tr>
-                          </thead>
-                          <tbody>
-                            {ratingsData.map((row, index) => (
-                              <tr key={index} className="hover:bg-gray-50">
-                                <td className="border border-gray-300 p-2 font-medium">
-                                  {row['Ship Name']}
-                                </td>
-                                <td className="border border-gray-300 p-2">
-                                  {row['Sailing Number']}
-                                </td>
-                                <td className="border border-gray-300 p-2 capitalize">
-                                  {row['Fleet']}
-                                </td>
-                                {group.metrics.map(metric => (
-                                  <td key={metric} className="border border-gray-300 p-2 text-center">
-                                    {row[metric] !== undefined && row[metric] !== null ? (
-                                      <Badge 
-                                        className={getRatingColor(parseFloat(row[metric]))}
-                                        variant="secondary"
-                                      >
-                                        {parseFloat(row[metric]).toFixed(1)}
-                                      </Badge>
-                                    ) : (
-                                      <span className="text-gray-400">N/A</span>
-                                    )}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              ))}
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
           ) : (
             <Card>

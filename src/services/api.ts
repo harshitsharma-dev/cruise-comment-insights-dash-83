@@ -11,6 +11,7 @@ class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const response = await fetch(url, {
+      mode: 'cors',
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -70,6 +71,7 @@ class ApiService {
         filteredMetric: number[];
         filteredCount: number;
         comparisonToOverall?: number;
+        error?: string;
       }>;
       filterBelow?: number;
       comparedToAverage: boolean;
@@ -111,6 +113,20 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(filters),
     });
+  }
+
+  async getShips() {
+    return this.request<{ 
+      status: string; 
+      data: Array<{
+        name: string;
+        id: number;
+      }>;
+    }>('/sailing/ships');
+  }
+
+  async checkConnection() {
+    return this.request<string>('/sailing/check');
   }
 }
 
