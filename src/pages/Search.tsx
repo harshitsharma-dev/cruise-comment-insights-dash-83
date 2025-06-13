@@ -42,6 +42,16 @@ const Search = () => {
       return;
     }
 
+    if (!filters.fleets || filters.fleets.length === 0) {
+      alert('Please select at least one fleet');
+      return;
+    }
+
+    if (!filters.ships || filters.ships.length === 0) {
+      alert('Please select at least one ship');
+      return;
+    }
+
     setLoading(true);
     try {
       const searchData = {
@@ -60,6 +70,7 @@ const Search = () => {
         num_results: numResults
       };
 
+      console.log('Sending search request:', searchData);
       const response = await apiService.semanticSearch(searchData);
       setResults(response.results || []);
     } catch (error) {

@@ -1,3 +1,4 @@
+
 const API_BASE_URL = 'http://13.126.187.166:5000';
 
 class ApiService {
@@ -25,14 +26,19 @@ class ApiService {
   }
 
   async authenticate(credentials: { username: string; password: string }) {
-    return this.request<any>('/sailing/auth', {
+    return this.request<{
+      authenticated: boolean;
+      user?: string;
+      role?: string;
+      error?: string;
+    }>('/sailing/auth', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
   }
 
   async getFleets() {
-    return this.request<{ status: string; data: any[] }>('/sailing/fleets');
+    return this.request<{ status: string; data: Array<{ fleet: string; ships: string[] }> }>('/sailing/fleets');
   }
 
   async getMetrics() {
@@ -51,21 +57,57 @@ class ApiService {
   }
 
   async getMetricRating(data: any) {
-    return this.request<{ status: string; results: any[] }>('/sailing/getMetricRating', {
+    return this.request<{ 
+      status: string; 
+      metric: string;
+      results: Array<{
+        ship: string;
+        sailingNumber: string;
+        metric: string;
+        averageRating: number;
+        ratingCount: number;
+        filteredReviews: string[];
+        filteredMetric: number[];
+        filteredCount: number;
+        comparisonToOverall?: number;
+      }>;
+      filterBelow?: number;
+      comparedToAverage: boolean;
+    }>('/sailing/getMetricRating', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
   async semanticSearch(searchData: any) {
-    return this.request<{ status: string; results: any[] }>('/sailing/semanticSearch', {
+    return this.request<{ 
+      status: string; 
+      results: Array<{
+        comment: string;
+        sheet_name: string;
+        meal_time: string;
+        metadata: {
+          fleet: string;
+          ship: string;
+          sailing_number: string;
+          date: string;
+        };
+      }>;
+    }>('/sailing/semanticSearch', {
       method: 'POST',
       body: JSON.stringify(searchData),
     });
   }
 
   async getIssuesSummary(filters: any) {
-    return this.request<{ status: string; data: any }>('/sailing/issuesSmry', {
+    return this.request<{ 
+      status: string; 
+      data: {
+        total_issues: number;
+        resolved_issues: number;
+        unresolved_issues: number;
+      };
+    }>('/sailing/issuesSmry', {
       method: 'POST',
       body: JSON.stringify(filters),
     });

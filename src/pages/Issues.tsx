@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,13 +32,23 @@ const Issues = () => {
   };
 
   const fetchIssues = async () => {
+    if (!filters.fromDate || !filters.toDate) {
+      alert('Please select date range');
+      return;
+    }
+
     setLoading(true);
     try {
       const issuesFilters = {
-        ...filters,
+        filter_by: 'date',
+        filters: {
+          fromDate: filters.fromDate,
+          toDate: filters.toDate
+        },
         sheets: selectedSheets.length > 0 ? selectedSheets : sheetsData?.data || []
       };
 
+      console.log('Sending issues request:', issuesFilters);
       const response = await apiService.getIssuesSummary(issuesFilters);
       setIssuesData(response.data);
     } catch (error) {
@@ -110,19 +119,19 @@ const Issues = () => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="text-center p-4 bg-red-50 rounded-lg">
                       <div className="text-2xl font-bold text-red-600">
-                        {issuesData.total_issues || 0}
+                        {issuesData.total_issues}
                       </div>
                       <p className="text-sm text-gray-600">Total Issues</p>
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-2xl font-bold text-green-600">
-                        {issuesData.resolved_issues || 0}
+                        {issuesData.resolved_issues}
                       </div>
                       <p className="text-sm text-gray-600">Resolved Issues</p>
                     </div>
                     <div className="text-center p-4 bg-yellow-50 rounded-lg">
                       <div className="text-2xl font-bold text-yellow-600">
-                        {issuesData.unresolved_issues || 0}
+                        {issuesData.unresolved_issues}
                       </div>
                       <p className="text-sm text-gray-600">Unresolved Issues</p>
                     </div>
@@ -130,44 +139,17 @@ const Issues = () => {
                 </CardContent>
               </Card>
 
-              {/* Detailed Issues by Sailing */}
+              {/* Additional Issues Analysis */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Issues by Sailing</CardTitle>
+                  <CardTitle>Issues Analysis</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {/* Mock detailed issues data */}
-                    {[
-                      { ship: 'Discovery', sailing: 'D001', issues: ['Food quality complaints', 'Cabin cleanliness'], trend: 'up' },
-                      { ship: 'Explorer', sailing: 'E002', issues: ['Entertainment scheduling', 'Bar service delays'], trend: 'down' },
-                      { ship: 'Voyager', sailing: 'V003', issues: ['Excursion cancellations'], trend: 'same' }
-                    ].map((sailing, index) => (
-                      <div key={index} className="border rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="font-semibold">{sailing.ship}</h3>
-                            <p className="text-sm text-gray-600">Sailing: {sailing.sailing}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {sailing.trend === 'up' && <TrendingUp className="h-4 w-4 text-red-500" />}
-                            {sailing.trend === 'down' && <TrendingDown className="h-4 w-4 text-green-500" />}
-                            <Badge variant={sailing.trend === 'up' ? 'destructive' : 'secondary'}>
-                              {sailing.issues.length} issues
-                            </Badge>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          {sailing.issues.map((issue, issueIndex) => (
-                            <div key={issueIndex} className="text-sm p-2 bg-gray-50 rounded">
-                              {issue}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-gray-600">
+                    Based on the selected date range and sheets, we found {issuesData.total_issues} total issues. 
+                    {issuesData.resolved_issues > 0 && ` ${issuesData.resolved_issues} have been resolved.`}
+                    {issuesData.unresolved_issues > 0 && ` ${issuesData.unresolved_issues} require attention.`}
+                  </p>
                 </CardContent>
               </Card>
             </div>

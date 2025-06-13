@@ -11,10 +11,10 @@ import { apiService } from '@/services/api';
 
 const MetricFilter = () => {
   const [selectedMetric, setSelectedMetric] = useState<string>('');
-  const [ratingRange, setRatingRange] = useState([0, 10]);
   const [filterBelow, setFilterBelow] = useState<number | null>(null);
   const [results, setResults] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [filters, setFilters] = useState<any>({});
 
   // Fetch available metrics
   const { data: metricsData } = useQuery({
@@ -22,25 +22,40 @@ const MetricFilter = () => {
     queryFn: () => apiService.getMetrics(),
   });
 
-  const handleSearch = async (filterData: any) => {
+  const handleFilterChange = (filterData: any) => {
+    setFilters(filterData);
+  };
+
+  const handleSearch = async () => {
     if (!selectedMetric) {
       alert('Please select a metric');
+      return;
+    }
+
+    if (!filters.fromDate || !filters.toDate) {
+      alert('Please select date range');
       return;
     }
 
     setIsLoading(true);
     try {
       const searchData = {
-        ...filterData,
+        filter_by: 'date',
+        filters: {
+          fromDate: filters.fromDate,
+          toDate: filters.toDate
+        },
         metric: selectedMetric,
         filterBelow: filterBelow,
         compareToAverage: true
       };
 
+      console.log('Sending metric filter request:', searchData);
       const response = await apiService.getMetricRating(searchData);
       setResults(response.results || []);
     } catch (error) {
       console.error('Error fetching metric data:', error);
+      alert('Error fetching metric data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +74,7 @@ const MetricFilter = () => {
           <CardTitle>Filter Options</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <BasicFilter onFilterChange={handleSearch} />
+          <BasicFilter onFilterChange={handleFilterChange} />
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -92,6 +107,14 @@ const MetricFilter = () => {
               />
             </div>
           </div>
+
+          <Button 
+            onClick={handleSearch} 
+            className="w-full"
+            disabled={isLoading || !selectedMetric || !filters.fromDate || !filters.toDate}
+          >
+            {isLoading ? 'Analyzing...' : 'Analyze Metric'}
+          </Button>
         </CardContent>
       </Card>
 
@@ -117,6 +140,11 @@ const MetricFilter = () => {
                       <p className="text-sm text-gray-600">
                         {result.ratingCount} ratings
                       </p>
+                      {result.comparisonToOverall && (
+                        <p className="text-xs text-gray-500">
+                          {result.comparisonToOverall > 0 ? '+' : ''}{result.comparisonToOverall} vs avg
+                        </p>
+                      )}
                     </div>
                   </div>
 
