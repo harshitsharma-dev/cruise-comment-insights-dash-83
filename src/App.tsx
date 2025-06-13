@@ -12,6 +12,7 @@ import RatingSummary from "./components/RatingSummary";
 import MetricFilter from "./pages/MetricFilter";
 import Search from "./pages/Search";
 import Issues from "./pages/Issues";
+import UserProfile from "./components/UserProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,7 @@ const AppRoutes = () => {
         <Route path="/metrics" element={<MetricFilter />} />
         <Route path="/search" element={<Search />} />
         <Route path="/issues" element={<Issues />} />
+        <Route path="/profile" element={<UserProfile />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

@@ -30,6 +30,7 @@ const Layout = () => {
     { name: 'Metric Filter', href: '/metrics', icon: TrendingUp },
     { name: 'Search', href: '/search', icon: Search },
     { name: 'Issues', href: '/issues', icon: AlertTriangle },
+    { name: 'Profile', href: '/profile', icon: User },
   ];
 
   return (
@@ -40,11 +41,14 @@ const Layout = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <div className="text-2xl font-bold text-blue-600">
-                Cruise Analytics
+                ClientCompany
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
+              <div className="text-sm font-bold text-gray-800">
+                Manotr Intelligence
+              </div>
               <div className="flex items-center space-x-2">
                 <User className="h-4 w-4 text-gray-500" />
                 <span className="text-sm text-gray-700">{user?.username}</span>
@@ -96,6 +100,17 @@ const Layout = () => {
           </main>
         </div>
       </div>
+
+      {/* Footer with Manotr Intelligence logo */}
+      <footer className="bg-white border-t mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex justify-end">
+            <div className="text-sm text-gray-500">
+              Powered by <span className="font-semibold">Manotr Intelligence</span>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

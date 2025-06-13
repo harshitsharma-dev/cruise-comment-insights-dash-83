@@ -2,17 +2,19 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react';
-import BasicFilter from '@/components/BasicFilter';
+import { apiService } from '../services/api';
+import BasicFilter from '../components/BasicFilter';
 import { useQuery } from '@tanstack/react-query';
-import { apiService } from '@/services/api';
 
 const Issues = () => {
   const [selectedSheets, setSelectedSheets] = useState<string[]>([]);
   const [issuesData, setIssuesData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState<any>({});
 
   // Fetch available sheets
   const { data: sheetsData } = useQuery({
@@ -20,178 +22,167 @@ const Issues = () => {
     queryFn: () => apiService.getSheets(),
   });
 
-  const handleAnalyze = async (filterData: any) => {
-    setIsLoading(true);
+  const handleSheetChange = (sheet: string, checked: boolean) => {
+    setSelectedSheets(prev => 
+      checked ? [...prev, sheet] : prev.filter(s => s !== sheet)
+    );
+  };
+
+  const handleFilterChange = (newFilters: any) => {
+    setFilters(newFilters);
+  };
+
+  const fetchIssues = async () => {
+    setLoading(true);
     try {
-      const requestData = {
-        ...filterData,
-        sheet_names: selectedSheets.length > 0 ? selectedSheets : undefined
+      const issuesFilters = {
+        ...filters,
+        sheets: selectedSheets.length > 0 ? selectedSheets : sheetsData?.data || []
       };
 
-      const response = await apiService.getIssuesSummary(requestData);
+      const response = await apiService.getIssuesSummary(issuesFilters);
       setIssuesData(response.data);
     } catch (error) {
-      console.error('Error fetching issues data:', error);
+      console.error('Error fetching issues:', error);
+      alert('Failed to fetch issues data');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Issues Analysis</h1>
-        <p className="text-gray-600 mt-2">Identify and track issues across sailings</p>
+        <h1 className="text-3xl font-bold text-gray-900">Issues Summary</h1>
+        <p className="text-gray-600 mt-2">Analyze and track issues across sailings</p>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Analysis Options</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <BasicFilter onFilterChange={handleAnalyze} />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-1 space-y-6">
+          <BasicFilter onFilterChange={handleFilterChange} />
           
-          <div>
-            <label className="block text-sm font-medium mb-2">Sheet Selection</label>
-            <Select 
-              value={selectedSheets[0] || 'all'} 
-              onValueChange={(value) => setSelectedSheets(value === 'all' ? [] : [value])}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select sheets to analyze..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sheets</SelectItem>
+          {/* Sheet Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Sheet Selection</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
                 {sheetsData?.data?.map((sheet: string) => (
-                  <SelectItem key={sheet} value={sheet}>
-                    {sheet}
-                  </SelectItem>
+                  <div key={sheet} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`issue-sheet-${sheet}`}
+                      checked={selectedSheets.includes(sheet)}
+                      onCheckedChange={(checked) => 
+                        handleSheetChange(sheet, checked as boolean)
+                      }
+                    />
+                    <Label htmlFor={`issue-sheet-${sheet}`} className="text-sm">
+                      {sheet}
+                    </Label>
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button onClick={() => handleAnalyze({})} disabled={isLoading} className="w-full">
-            {isLoading ? 'Analyzing...' : 'Analyze Issues'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Results */}
-      {issuesData && (
-        <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Issues</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{issuesData.total_issues || 0}</div>
-                <p className="text-xs text-gray-600">Across all sailings</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">
-                  {issuesData.resolved_issues || 0}
-                </div>
-                <p className="text-xs text-gray-600">Successfully addressed</p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                <TrendingDown className="h-4 w-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">
-                  {issuesData.unresolved_issues || 0}
-                </div>
-                <p className="text-xs text-gray-600">Requiring attention</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Detailed Issues List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Issue Details by Sailing</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Mock detailed issues - replace with actual data structure when available */}
-                <div className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold">Ship Explorer - Sailing EX001</h3>
-                      <p className="text-sm text-gray-600">March 15-22, 2024</p>
-                    </div>
-                    <Badge variant="destructive">High Priority</Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="p-3 bg-red-50 rounded">
-                      <p className="text-sm font-medium text-red-800">Cabin Cleanliness Issues</p>
-                      <p className="text-sm text-red-600">Multiple reports of inadequate cleaning</p>
-                    </div>
-                    <div className="p-3 bg-yellow-50 rounded">
-                      <p className="text-sm font-medium text-yellow-800">Food Service Delays</p>
-                      <p className="text-sm text-yellow-600">Extended wait times reported</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="font-semibold">Ship Discovery - Sailing DI002</h3>
-                      <p className="text-sm text-gray-600">March 22-29, 2024</p>
-                    </div>
-                    <Badge variant="secondary">Medium Priority</Badge>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="p-3 bg-yellow-50 rounded">
-                      <p className="text-sm font-medium text-yellow-800">Entertainment Equipment</p>
-                      <p className="text-sm text-yellow-600">Technical issues with sound system</p>
-                    </div>
-                  </div>
-                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Trends Chart Placeholder */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Issues Trend Comparison</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-                <div className="text-center">
-                  <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">Issue trends chart will be displayed here</p>
-                  <p className="text-sm text-gray-500">Data visualization coming soon</p>
-                </div>
-              </div>
+              
+              <Button 
+                onClick={fetchIssues} 
+                className="w-full mt-4"
+                disabled={loading || !filters.fromDate || !filters.toDate}
+              >
+                {loading ? 'Loading...' : 'Get Issues Summary'}
+              </Button>
             </CardContent>
           </Card>
         </div>
-      )}
 
-      {isLoading && (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Analyzing issues...</p>
+        <div className="lg:col-span-3">
+          {issuesData ? (
+            <div className="space-y-6">
+              {/* Summary Overview */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                    Issues Overview
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-red-50 rounded-lg">
+                      <div className="text-2xl font-bold text-red-600">
+                        {issuesData.total_issues || 0}
+                      </div>
+                      <p className="text-sm text-gray-600">Total Issues</p>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-lg">
+                      <div className="text-2xl font-bold text-green-600">
+                        {issuesData.resolved_issues || 0}
+                      </div>
+                      <p className="text-sm text-gray-600">Resolved Issues</p>
+                    </div>
+                    <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                      <div className="text-2xl font-bold text-yellow-600">
+                        {issuesData.unresolved_issues || 0}
+                      </div>
+                      <p className="text-sm text-gray-600">Unresolved Issues</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Detailed Issues by Sailing */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Issues by Sailing</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* Mock detailed issues data */}
+                    {[
+                      { ship: 'Discovery', sailing: 'D001', issues: ['Food quality complaints', 'Cabin cleanliness'], trend: 'up' },
+                      { ship: 'Explorer', sailing: 'E002', issues: ['Entertainment scheduling', 'Bar service delays'], trend: 'down' },
+                      { ship: 'Voyager', sailing: 'V003', issues: ['Excursion cancellations'], trend: 'same' }
+                    ].map((sailing, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-semibold">{sailing.ship}</h3>
+                            <p className="text-sm text-gray-600">Sailing: {sailing.sailing}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {sailing.trend === 'up' && <TrendingUp className="h-4 w-4 text-red-500" />}
+                            {sailing.trend === 'down' && <TrendingDown className="h-4 w-4 text-green-500" />}
+                            <Badge variant={sailing.trend === 'up' ? 'destructive' : 'secondary'}>
+                              {sailing.issues.length} issues
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {sailing.issues.map((issue, issueIndex) => (
+                            <div key={issueIndex} className="text-sm p-2 bg-gray-50 rounded">
+                              {issue}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <div className="text-center text-gray-500">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Configure filters and click "Get Issues Summary" to view data</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };

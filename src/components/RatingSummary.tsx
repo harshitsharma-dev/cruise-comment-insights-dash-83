@@ -55,8 +55,18 @@ const RatingSummary = () => {
   };
 
   const exportToExcel = () => {
-    // Implementation for Excel export
-    console.log('Exporting to Excel...');
+    // Simple CSV export for Excel compatibility
+    const headers = ['Ship Name', 'Sailing Number', 'Fleet', 'Start', 'End', ...Object.values(ratingGroups).flatMap(group => group.metrics)];
+    const csvContent = ratingsData.map(row => 
+      headers.map(header => `"${row[header] || 'N/A'}"`).join(',')
+    ).join('\n');
+    
+    const blob = new Blob([`${headers.join(',')}\n${csvContent}`], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'rating-summary.csv';
+    a.click();
   };
 
   const getRatingColor = (rating: number) => {
@@ -70,7 +80,7 @@ const RatingSummary = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Rating Summary</h1>
-        <Button onClick={exportToExcel} className="flex items-center gap-2">
+        <Button onClick={exportToExcel} className="flex items-center gap-2" disabled={ratingsData.length === 0}>
           <Download className="h-4 w-4" />
           Export to Excel
         </Button>
@@ -131,7 +141,7 @@ const RatingSummary = () => {
                                 <td className="border border-gray-300 p-2">
                                   {row['Sailing Number']}
                                 </td>
-                                <td className="border border-gray-300 p-2">
+                                <td className="border border-gray-300 p-2 capitalize">
                                   {row['Fleet']}
                                 </td>
                                 {group.metrics.map(metric => (
