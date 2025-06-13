@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useQuery } from '@tanstack/react-query';
 
 interface Fleet {
   fleet: string;
@@ -19,25 +20,22 @@ interface BasicFilterProps {
 }
 
 const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilters = {} }) => {
-  const [fleets, setFleets] = useState<Fleet[]>([]);
   const [selectedFleets, setSelectedFleets] = useState<string[]>(currentFilters.fleets || []);
   const [selectedShips, setSelectedShips] = useState<string[]>(currentFilters.ships || []);
   const [fromDate, setFromDate] = useState(currentFilters.fromDate || '');
   const [toDate, setToDate] = useState(currentFilters.toDate || '');
-  const [sailingNumbers, setSailingNumbers] = useState<string[]>(currentFilters.sailingNumbers || []);
+
+  // Fetch fleets data from API
+  const { data: fleetsData, isLoading: fleetsLoading, error: fleetsError } = useQuery({
+    queryKey: ['fleets'],
+    queryFn: () => apiService.getFleets(),
+  });
 
   useEffect(() => {
-    loadFleets();
-  }, []);
-
-  const loadFleets = async () => {
-    try {
-      const response = await apiService.getFleets();
-      setFleets(response.data);
-    } catch (error) {
-      console.error('Error loading fleets:', error);
+    if (fleetsError) {
+      console.error('Error loading fleets:', fleetsError);
     }
-  };
+  }, [fleetsError]);
 
   const handleFleetChange = (fleet: string, checked: boolean) => {
     const updatedFleets = checked 
@@ -47,8 +45,8 @@ const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilter
     setSelectedFleets(updatedFleets);
     
     // Reset ships if fleet is deselected
-    if (!checked) {
-      const fleetShips = fleets.find(f => f.fleet === fleet)?.ships || [];
+    if (!checked && fleetsData?.data) {
+      const fleetShips = fleetsData.data.find((f: Fleet) => f.fleet === fleet)?.ships || [];
       setSelectedShips(prev => prev.filter(ship => !fleetShips.includes(ship)));
     }
   };
@@ -62,26 +60,82 @@ const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilter
   };
 
   const getAvailableShips = () => {
-    return fleets
-      .filter(fleet => selectedFleets.includes(fleet.fleet))
-      .flatMap(fleet => fleet.ships);
+    if (!fleetsData?.data) return [];
+    
+    return fleetsData.data
+      .filter((fleet: Fleet) => selectedFleets.includes(fleet.fleet))
+      .flatMap((fleet: Fleet) => fleet.ships);
   };
 
   const handleApplyFilters = () => {
+    if (selectedFleets.length === 0) {
+      alert('Please select at least one fleet');
+      return;
+    }
+
+    if (selectedShips.length === 0) {
+      alert('Please select at least one ship');
+      return;
+    }
+
+    if (!fromDate || !toDate) {
+      alert('Please select both start and end dates');
+      return;
+    }
+
     const filters = {
       fleets: selectedFleets,
       ships: selectedShips,
       fromDate,
       toDate,
-      sailingNumbers,
       filter_by: 'date'
     };
+    
+    console.log('Applying filters:', filters);
     onFilterChange(filters);
   };
 
   const capitalizeFirst = (str: string) => {
     return str.charAt(0).toUpperCase() + str.slice(1);
   };
+
+  if (fleetsLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Basic Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-sm text-gray-600">Loading fleets...</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (fleetsError) {
+    return (
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Basic Filters
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4 text-red-600">
+            <p>Error loading fleets data</p>
+            <p className="text-sm">Please check your connection</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full">
@@ -96,7 +150,7 @@ const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilter
         <div className="space-y-3">
           <Label className="text-base font-medium">Fleet Selection</Label>
           <div className="grid grid-cols-2 gap-2">
-            {fleets.map((fleet) => (
+            {fleetsData?.data?.map((fleet: Fleet) => (
               <div key={fleet.fleet} className="flex items-center space-x-2">
                 <Checkbox
                   id={`fleet-${fleet.fleet}`}
@@ -161,7 +215,7 @@ const BasicFilter: React.FC<BasicFilterProps> = ({ onFilterChange, currentFilter
         <Button 
           onClick={handleApplyFilters}
           className="w-full"
-          disabled={selectedFleets.length === 0 || !fromDate || !toDate}
+          disabled={selectedFleets.length === 0 || selectedShips.length === 0 || !fromDate || !toDate}
         >
           Apply Filters
         </Button>

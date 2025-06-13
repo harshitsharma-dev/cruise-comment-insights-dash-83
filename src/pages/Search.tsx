@@ -24,8 +24,8 @@ const Search = () => {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<any>({});
 
-  // Fetch available sheets
-  const { data: sheetsData } = useQuery({
+  // Fetch available sheets from API
+  const { data: sheetsData, isLoading: sheetsLoading, error: sheetsError } = useQuery({
     queryKey: ['sheets'],
     queryFn: () => apiService.getSheets(),
   });
@@ -36,6 +36,11 @@ const Search = () => {
     );
   };
 
+  const handleFilterChange = (newFilters: any) => {
+    console.log('Filter change in Search:', newFilters);
+    setFilters(newFilters);
+  };
+
   const handleSearch = async () => {
     if (!query.trim()) {
       alert('Please enter a search query');
@@ -43,12 +48,17 @@ const Search = () => {
     }
 
     if (!filters.fleets || filters.fleets.length === 0) {
-      alert('Please select at least one fleet');
+      alert('Please select at least one fleet from the basic filters');
       return;
     }
 
     if (!filters.ships || filters.ships.length === 0) {
-      alert('Please select at least one ship');
+      alert('Please select at least one ship from the basic filters');
+      return;
+    }
+
+    if (!filters.fromDate || !filters.toDate) {
+      alert('Please select date range from the basic filters');
       return;
     }
 
@@ -60,11 +70,10 @@ const Search = () => {
         ships: filters.ships || [],
         filter_params: {
           from_date: filters.fromDate,
-          to_date: filters.toDate,
-          sailing_number: filters.sailingNumbers
+          to_date: filters.toDate
         },
         sheet_names: selectedSheets.length > 0 ? selectedSheets : sheetsData?.data || [],
-        meal_time: mealTime,
+        meal_time: mealTime === 'All' ? undefined : mealTime,
         semanticSearch: searchType === 'semantic',
         similarity_score_range: searchType === 'semantic' ? [cutOff[0] / 10, 1.0] : [0.0, 1.0],
         num_results: numResults
@@ -72,6 +81,7 @@ const Search = () => {
 
       console.log('Sending search request:', searchData);
       const response = await apiService.semanticSearch(searchData);
+      console.log('Search response:', response);
       setResults(response.results || []);
     } catch (error) {
       console.error('Search error:', error);
@@ -82,18 +92,28 @@ const Search = () => {
   };
 
   const exportResults = () => {
+    if (results.length === 0) {
+      alert('No results to export');
+      return;
+    }
+
     // Simple CSV export
     const csvContent = results.map(result => 
-      `"${result.comment}","${result.metadata.fleet}","${result.metadata.ship}","${result.sheet_name}","${result.metadata.sailing_number}"`
+      `"${result.comment?.replace(/"/g, '""') || ''}","${result.metadata?.fleet || ''}","${result.metadata?.ship || ''}","${result.sheet_name || ''}","${result.metadata?.sailing_number || ''}","${result.meal_time || ''}"`
     ).join('\n');
     
-    const blob = new Blob([`Comment,Fleet,Ship,Sheet,Sailing Number\n${csvContent}`], { type: 'text/csv' });
+    const blob = new Blob([`Comment,Fleet,Ship,Sheet,Sailing Number,Meal Time\n${csvContent}`], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = 'search-results.csv';
     a.click();
+    URL.revokeObjectURL(url);
   };
+
+  if (sheetsError) {
+    console.error('Error loading sheets:', sheetsError);
+  }
 
   return (
     <div className="space-y-6">
@@ -105,14 +125,14 @@ const Search = () => {
         {results.length > 0 && (
           <Button onClick={exportResults} className="flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Export Results
+            Export Results ({results.length})
           </Button>
         )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1">
-          <BasicFilter onFilterChange={setFilters} />
+          <BasicFilter onFilterChange={handleFilterChange} />
         </div>
 
         <div className="lg:col-span-3 space-y-6">
@@ -136,22 +156,28 @@ const Search = () => {
               {/* Sheet Selection */}
               <div>
                 <Label className="text-base font-medium">Sheet Names</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {sheetsData?.data?.map((sheet: string) => (
-                    <div key={sheet} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`sheet-${sheet}`}
-                        checked={selectedSheets.includes(sheet)}
-                        onCheckedChange={(checked) => 
-                          handleSheetChange(sheet, checked as boolean)
-                        }
-                      />
-                      <Label htmlFor={`sheet-${sheet}`} className="text-sm">
-                        {sheet}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                {sheetsLoading ? (
+                  <div className="text-sm text-gray-500 mt-2">Loading sheets...</div>
+                ) : sheetsError ? (
+                  <div className="text-sm text-red-500 mt-2">Error loading sheets</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    {sheetsData?.data?.map((sheet: string) => (
+                      <div key={sheet} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`sheet-${sheet}`}
+                          checked={selectedSheets.includes(sheet)}
+                          onCheckedChange={(checked) => 
+                            handleSheetChange(sheet, checked as boolean)
+                          }
+                        />
+                        <Label htmlFor={`sheet-${sheet}`} className="text-sm">
+                          {sheet}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Meal Time */}
@@ -210,13 +236,17 @@ const Search = () => {
                   id="numResults"
                   type="number"
                   value={numResults}
-                  onChange={(e) => setNumResults(parseInt(e.target.value))}
+                  onChange={(e) => setNumResults(parseInt(e.target.value) || 50)}
                   min="1"
                   max="1000"
                 />
               </div>
 
-              <Button onClick={handleSearch} className="w-full" disabled={loading}>
+              <Button 
+                onClick={handleSearch} 
+                className="w-full" 
+                disabled={loading || !query.trim() || !filters.fleets?.length || !filters.ships?.length || !filters.fromDate || !filters.toDate}
+              >
                 <SearchIcon className="h-4 w-4 mr-2" />
                 {loading ? 'Searching...' : 'Search'}
               </Button>
@@ -234,20 +264,28 @@ const Search = () => {
                   {results.map((result, index) => (
                     <div key={index} className="border rounded-lg p-4 bg-gray-50">
                       <div className="flex justify-between items-start mb-2">
-                        <div className="flex gap-2">
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                            {result.metadata.fleet}
-                          </span>
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                            {result.metadata.ship}
-                          </span>
-                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                            {result.sheet_name}
-                          </span>
+                        <div className="flex gap-2 flex-wrap">
+                          {result.metadata?.fleet && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                              {result.metadata.fleet}
+                            </span>
+                          )}
+                          {result.metadata?.ship && (
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                              {result.metadata.ship}
+                            </span>
+                          )}
+                          {result.sheet_name && (
+                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                              {result.sheet_name}
+                            </span>
+                          )}
                         </div>
-                        <span className="text-xs text-gray-500">
-                          Sailing: {result.metadata.sailing_number}
-                        </span>
+                        {result.metadata?.sailing_number && (
+                          <span className="text-xs text-gray-500">
+                            Sailing: {result.metadata.sailing_number}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-700">{result.comment}</p>
                       {result.meal_time && (
@@ -258,6 +296,21 @@ const Search = () => {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {loading && (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Searching...</p>
+            </div>
+          )}
+
+          {results.length === 0 && !loading && query && filters.fleets && (
+            <Card>
+              <CardContent className="flex items-center justify-center h-32">
+                <p className="text-gray-500">No results found. Try adjusting your search query or filters.</p>
               </CardContent>
             </Card>
           )}
