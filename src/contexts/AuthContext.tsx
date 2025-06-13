@@ -34,6 +34,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
+    // Hardcoded credentials for testing
+    const testCredentials = [
+      { username: 'admin', password: 'admin123', role: 'admin' },
+      { username: 'test', password: 'test123', role: 'user' },
+      { username: 'demo', password: 'demo', role: 'user' }
+    ];
+
+    const validUser = testCredentials.find(
+      cred => cred.username === username && cred.password === password
+    );
+
+    if (validUser) {
+      const userData = { username: validUser.username, role: validUser.role };
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return true;
+    }
+
+    // Fallback to backend if hardcoded fails
     try {
       const response = await fetch('http://localhost:5000/sailing/auth', {
         method: 'POST',
